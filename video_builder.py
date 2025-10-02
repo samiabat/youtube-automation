@@ -40,11 +40,16 @@ from download_assets import (
     make_provider, 
     fetch_asset_url, 
     download_asset,
+    validate_asset,
     ImageFallbackProvider,
 )
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+# Path to fallback assets (can be overridden)
+FALLBACK_VIDEO_PATH = None
+FALLBACK_IMAGE_PATH = None
 
 # Ensure NLTK data is available
 def _ensure_nltk():
@@ -141,14 +146,137 @@ def simplify_query(query: str, style: str) -> str:
     return random.choice(THEME_MAP.get(style, THEME_MAP["general"]))
 
 
+def validate_video_clip(path: str) -> bool:
+    """
+    Validate that a video file is readable and has valid duration.
+    
+    Args:
+        path: Path to video file
+        
+    Returns:
+        True if video is valid, False otherwise
+    """
+    try:
+        from moviepy.editor import VideoFileClip
+        clip = VideoFileClip(path, has_mask=False)
+        duration = clip.duration
+        clip.close()
+        
+        if duration <= 0:
+            logger.warning(f"Video has invalid duration ({duration}s): {path}")
+            return False
+        
+        logger.debug(f"Video validated: {path} (duration: {duration:.2f}s)")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to validate video {path}: {e}")
+        return False
+
+
+def extend_clip_to_duration(clip, target_duration: float):
+    """
+    Extend a clip to match target duration by looping or freezing last frame.
+    
+    Args:
+        clip: VideoFileClip or ImageClip to extend
+        target_duration: Target duration in seconds
+        
+    Returns:
+        Extended clip
+    """
+    if clip.duration >= target_duration:
+        return clip
+    
+    # For very short clips (< 0.5s), use freeze frame on last frame
+    if clip.duration < 0.5:
+        logger.info(f"Clip is very short ({clip.duration:.2f}s), using freeze frame")
+        try:
+            # Get the last frame and extend it
+            from moviepy.video.fx.all import freeze
+            frozen = freeze(clip, t=clip.duration - 0.01, freeze_duration=target_duration)
+            return frozen
+        except Exception as e:
+            logger.warning(f"Failed to freeze frame: {e}, using loop instead")
+    
+    # For longer clips, loop them
+    logger.info(f"Extending clip from {clip.duration:.2f}s to {target_duration:.2f}s by looping")
+    try:
+        # Calculate how many loops we need
+        loops_needed = int(target_duration / clip.duration) + 1
+        from moviepy.editor import concatenate_videoclips
+        looped = concatenate_videoclips([clip] * loops_needed, method="compose")
+        return looped.subclip(0, target_duration)
+    except Exception as e:
+        logger.error(f"Failed to loop clip: {e}")
+        return clip
+
+
+def create_fallback_clip(w: int, h: int, duration: float, text: str = "") -> 'VideoClip':
+    """
+    Create a fallback clip when no asset is available.
+    Uses a colored gradient background instead of black screen.
+    
+    Args:
+        w: Width
+        h: Height  
+        duration: Duration in seconds
+        text: Optional text to display
+        
+    Returns:
+        VideoClip with gradient background
+    """
+    logger.info(f"Creating fallback clip with gradient background (duration: {duration:.2f}s)")
+    
+    try:
+        # Create a simple gradient background
+        gradient_img = Image.new("RGB", (w, h))
+        pixels = gradient_img.load()
+        
+        # Create a blue-to-purple gradient
+        for y in range(h):
+            r = int(30 + (y / h) * 50)  # 30 to 80
+            g = int(30 + (y / h) * 30)  # 30 to 60
+            b = int(60 + (y / h) * 80)  # 60 to 140
+            for x in range(w):
+                pixels[x, y] = (r, g, b)
+        
+        gradient_array = np.asarray(gradient_img)
+        bg = ImageClip(gradient_array).set_duration(duration)
+        
+        # Add text if provided
+        if text:
+            txt_clip = make_subtitle_clip(f"[{text}]", w, h, fontsize=48)
+            if txt_clip is not None:
+                return CompositeVideoClip([bg, txt_clip.set_duration(duration)], size=(w, h))
+        
+        return bg
+    except Exception as e:
+        logger.error(f"Failed to create gradient fallback: {e}, using solid color")
+        # Ultimate fallback - dark blue solid color
+        return ColorClip(size=(w, h), color=(30, 40, 80)).set_duration(duration)
+
+
 def ensure_resolution(clip, w: int, h: int, fit: str = "cover"):
-    """Resize and crop clip to target resolution."""
+    """
+    Resize and crop clip to target resolution.
+    Handles both landscape and portrait clips properly.
+    """
     if fit == "cover":
-        return clip.fx(
-            lambda c: c.resize(height=h).crop(x_center=c.w/2, y_center=c.h/2, width=w, height=h)
-            if (c.w/c.h) > (w/h)
-            else c.resize(width=w).crop(x_center=c.w/2, y_center=c.h/2, width=w, height=h)
-        )
+        # Calculate aspect ratios
+        clip_aspect = clip.w / clip.h
+        target_aspect = w / h
+        
+        # Determine if we need to scale by width or height
+        if clip_aspect > target_aspect:
+            # Clip is wider, scale by height
+            scaled = clip.resize(height=h)
+        else:
+            # Clip is taller or same aspect, scale by width
+            scaled = clip.resize(width=w)
+        
+        # Crop to exact size
+        cropped = scaled.crop(x_center=scaled.w/2, y_center=scaled.h/2, width=w, height=h)
+        return cropped
     else:
         return clip.resize(newsize=(w, h))
 
@@ -326,14 +454,9 @@ def build_video(audio_path: str,
         
         # Build clip based on asset type
         if not url or asset_type == "none":
-            # Ultimate fallback: black screen with query text
-            logger.warning(f"No assets found, using black screen for segment {seg.idx}")
-            bg = ColorClip(size=(w, h), color=(0, 0, 0)).set_duration(seg.dur)
-            txt = make_subtitle_clip(f"[{query}]", w, h, fontsize=48)
-            if txt is not None:
-                clip = CompositeVideoClip([bg, txt.set_duration(seg.dur)], size=(w, h))
-            else:
-                clip = bg
+            # Ultimate fallback: gradient background with query text
+            logger.warning(f"No assets found, using fallback clip for segment {seg.idx}")
+            clip = create_fallback_clip(w, h, seg.dur, query)
         elif asset_type == "image":
             # Use image as static clip
             logger.info(f"Using image asset for segment {seg.idx}")
@@ -343,28 +466,40 @@ def build_video(audio_path: str,
                 img_clip = ensure_resolution(img_clip, w, h, fit="cover")
                 clip = img_clip
             except Exception as e:
-                logger.error(f"Failed to load image: {e}, using black screen")
-                clip = ColorClip(size=(w, h), color=(0, 0, 0)).set_duration(seg.dur)
+                logger.error(f"Failed to load image: {e}, using fallback clip")
+                clip = create_fallback_clip(w, h, seg.dur, query)
         else:
             # Use video clip
             logger.info(f"Using video asset for segment {seg.idx}")
             try:
                 path = download_asset(url, tmpdir)
-                base = VideoFileClip(path, has_mask=False).without_audio()
                 
-                # Cut video to segment duration
-                if base.duration <= seg.dur + 0.2:
-                    sub = base
+                # Validate video before using
+                if not validate_video_clip(path):
+                    logger.error(f"Video validation failed for {path}, trying next asset or fallback")
+                    # Try to get another asset from the same query
+                    clip = create_fallback_clip(w, h, seg.dur, query)
                 else:
-                    max_start = max(0, base.duration - seg.dur)
-                    start_t = random.uniform(0, max_start)
-                    sub = base.subclip(start_t, start_t + seg.dur)
-                
-                sub = ensure_resolution(sub, w, h, fit="cover")
-                clip = sub
+                    base = VideoFileClip(path, has_mask=False).without_audio()
+                    
+                    # Check if video needs to be extended
+                    if base.duration < seg.dur:
+                        logger.warning(f"Video duration ({base.duration:.2f}s) is shorter than segment ({seg.dur:.2f}s)")
+                        base = extend_clip_to_duration(base, seg.dur)
+                    
+                    # Cut video to segment duration
+                    if base.duration <= seg.dur + 0.2:
+                        sub = base
+                    else:
+                        max_start = max(0, base.duration - seg.dur)
+                        start_t = random.uniform(0, max_start)
+                        sub = base.subclip(start_t, start_t + seg.dur)
+                    
+                    sub = ensure_resolution(sub, w, h, fit="cover")
+                    clip = sub
             except Exception as e:
-                logger.error(f"Failed to load video: {e}, using black screen")
-                clip = ColorClip(size=(w, h), color=(0, 0, 0)).set_duration(seg.dur)
+                logger.error(f"Failed to load video: {e}, using fallback clip")
+                clip = create_fallback_clip(w, h, seg.dur, query)
         
         # Add subtitles if enabled
         if subs:
