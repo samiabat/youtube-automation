@@ -1,1 +1,231 @@
-# youtube-automation
+# YouTube Automation
+
+Automated video generation from audio narration with stock footage from Pexels and Pixabay.
+
+## Features
+
+✅ **Automatic transcription** using Whisper AI  
+✅ **Smart asset selection** with full-text queries for better relevance  
+✅ **Multi-provider support** - Pexels and Pixabay video APIs  
+✅ **Image fallback** - Uses static images when videos aren't available  
+✅ **No black screens** - Every segment has visual content  
+✅ **Modular architecture** - Clean separation of concerns  
+✅ **Comprehensive logging** - Track every asset selection  
+✅ **Environment-based configuration** - Secure API key management  
+
+## Quick Start
+
+### 1. Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/samiabat/youtube-automation.git
+cd youtube-automation
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Download NLTK data
+python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('stopwords')"
+```
+
+### 2. Configuration
+
+Copy the example environment file and add your API keys:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and add your API keys:
+
+```env
+PEXELS_API_KEY=your_pexels_api_key_here
+PIXABAY_API_KEY=your_pixabay_api_key_here
+```
+
+**Get API Keys:**
+- Pexels: https://www.pexels.com/api/
+- Pixabay: https://pixabay.com/api/docs/
+
+### 3. Usage
+
+#### Basic usage with auto-transcription:
+
+```bash
+python main.py --audio narration.mp3 --autocaptions --out video.mp4
+```
+
+#### Use existing captions:
+
+```bash
+python main.py --audio narration.mp3 --captions captions.vtt --out video.mp4
+```
+
+#### Customize video settings:
+
+```bash
+python main.py \
+  --audio narration.mp3 \
+  --autocaptions \
+  --resolution 1080x1920 \
+  --fps 60 \
+  --style cinematic \
+  --out vertical_video.mp4
+```
+
+#### With custom queries for specific segments:
+
+```bash
+python main.py \
+  --audio narration.mp3 \
+  --captions captions.vtt \
+  --custom-queries queries.json \
+  --out video.mp4
+```
+
+## Command-Line Options
+
+### Required Arguments
+
+- `--audio PATH` - Path to narration audio file (mp3/wav)
+- `--autocaptions` OR `--captions PATH` - Generate captions or use existing file
+
+### Caption Options
+
+- `--captions-out PATH` - Where to save generated captions (default: captions.vtt)
+- `--whisper-model MODEL` - Whisper model: tiny, base, small, medium, large, large-v3
+- `--device DEVICE` - Computation device: cpu, cuda, auto
+
+### Output Options
+
+- `--out PATH` - Output video path (default: output.mp4)
+- `--resolution WxH` - Video resolution, e.g., 1920x1080 or 1080x1920
+- `--fps N` - Frames per second (default: 30)
+
+### Provider Options
+
+- `--provider NAME` - Primary stock provider: pexels or pixabay
+- `--fallback NAME` - Fallback stock provider: pexels or pixabay
+
+### Style Options
+
+- `--style STYLE` - Video style: general, cinematic, nature, tech
+- `--custom-queries PATH` - JSON file with custom search queries per segment
+
+### Feature Toggles
+
+- `--no-subs` - Disable subtitle overlay
+- `--transitions` - Enable crossfade transitions between clips
+
+### Advanced Options
+
+- `--min-seg SECONDS` - Minimum segment duration (default: 0.12)
+- `--tmpdir PATH` - Temporary directory for downloads (default: _auto_tmp)
+- `--log-level LEVEL` - Logging level: DEBUG, INFO, WARNING, ERROR
+
+## Architecture
+
+The codebase is organized into modular components:
+
+```
+youtube-automation/
+├── main.py              # Main entry point and CLI
+├── config.py            # Configuration and environment variables
+├── transcribe.py        # Audio transcription with Whisper
+├── download_assets.py   # Stock video/image providers
+├── video_builder.py     # Video assembly and rendering
+├── auto_video_backaup.py  # Legacy monolithic script (backup)
+├── .env                 # Your API keys (not in git)
+├── .env.example         # Template for .env
+└── requirements.txt     # Python dependencies
+```
+
+### Key Improvements
+
+1. **No More Black Screens**: Every segment gets a video, image, or meaningful fallback
+2. **Better Content Relevance**: Uses full segment text for queries instead of just keywords
+3. **Smart Fallback Chain**: Video → Image → Simplified Query → Theme-based fallback
+4. **Comprehensive Logging**: Track every asset selection decision
+5. **Secure Configuration**: API keys in .env file, not in code
+6. **Modular Design**: Easy to extend and maintain
+
+## Custom Queries
+
+Create a JSON file to override automatic query generation for specific segments:
+
+```json
+{
+  "0": "sunrise over mountains",
+  "5": "busy city street at night",
+  "12": "close up of hands typing on keyboard"
+}
+```
+
+Keys are segment indices (starting from 0), values are search queries.
+
+## Logging
+
+All operations are logged to both console and `automation.log` file. Use `--log-level DEBUG` for detailed information about asset selection and processing.
+
+Example log output:
+```
+2024-01-15 10:23:45 - video_builder - INFO - --- Processing segment 0 (0.00s - 3.50s, duration: 3.50s) ---
+2024-01-15 10:23:45 - video_builder - INFO - Text: 'Welcome to our tutorial on machine learning'
+2024-01-15 10:23:45 - video_builder - INFO - Generated query: 'Welcome to our tutorial on machine learning'
+2024-01-15 10:23:46 - download_assets - INFO - Searching Pexels for: 'Welcome to our tutorial on machine learning'
+2024-01-15 10:23:47 - download_assets - INFO - Pexels returned 3 video URLs
+2024-01-15 10:23:47 - download_assets - INFO - Using video from primary provider
+2024-01-15 10:23:48 - video_builder - INFO - Using video asset for segment 0
+```
+
+## Environment Variables
+
+All settings can be configured via `.env` file:
+
+```env
+# Required: At least one API key
+PEXELS_API_KEY=your_key
+PIXABAY_API_KEY=your_key
+
+# Optional: Whisper settings
+WHISPER_MODEL=small
+WHISPER_DEVICE=auto
+
+# Optional: Video settings
+DEFAULT_RESOLUTION=1920x1080
+DEFAULT_FPS=30
+DEFAULT_STYLE=general
+
+# Optional: Provider preferences
+PRIMARY_PROVIDER=pexels
+FALLBACK_PROVIDER=pixabay
+
+# Optional: Logging
+LOG_LEVEL=INFO
+```
+
+## Troubleshooting
+
+### No API keys error
+Make sure you've created `.env` file and added at least one valid API key.
+
+### NLTK data not found
+Run: `python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"`
+
+### FFmpeg not found
+Install ffmpeg: 
+- Ubuntu/Debian: `sudo apt-get install ffmpeg`
+- macOS: `brew install ffmpeg`
+- Windows: Download from https://ffmpeg.org/
+
+### Out of memory
+Try reducing video resolution or using a smaller Whisper model.
+
+## License
+
+MIT License - See LICENSE file for details
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

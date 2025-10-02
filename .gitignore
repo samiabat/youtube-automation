@@ -1,1 +1,13 @@
 /venv
+_auto_tmp/
+*.mp4
+*.mp3
+*.wav
+*.vtt
+*.srt
+*.pyc
+__pycache__/
+.env
+automation.log
+*.log
+.DS_Store
