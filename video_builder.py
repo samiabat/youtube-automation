@@ -12,6 +12,14 @@ import json
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+# Pillow compatibility shim for moviepy
+try:
+    Resampling = getattr(Image, "Resampling", None)
+    if Resampling is not None and not hasattr(Image, "ANTIALIAS"):
+        Image.ANTIALIAS = Resampling.LANCZOS  # keep MoviePy happy on Pillow≥10
+except Exception:
+    pass
+
 # Video editing
 from moviepy.editor import (
     AudioFileClip,

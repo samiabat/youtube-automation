@@ -4,7 +4,7 @@ Handles fetching assets from Pexels and Pixabay providers.
 """
 import os
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import requests
 
 from config import Config
@@ -181,7 +181,7 @@ def download_asset(url: str, tmpdir: str) -> str:
 
 def fetch_asset_url(query: str, primary: Optional[StockProvider], 
                    fallback: Optional[StockProvider],
-                   image_fallback: Optional[ImageFallbackProvider] = None) -> tuple[Optional[str], str]:
+                   image_fallback: Optional[ImageFallbackProvider] = None) -> Tuple[Optional[str], str]:
     """
     Fetch a video or image URL for the given query.
     Returns (url, asset_type) where asset_type is 'video' or 'image'.
