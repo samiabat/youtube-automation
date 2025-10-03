@@ -11,6 +11,9 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
+# Minimum file size to consider valid (10KB)
+MIN_VALID_FILE_SIZE = 10000
+
 
 class StockProvider:
     """Base class for stock media providers."""
@@ -149,6 +152,30 @@ def make_provider(name: Optional[str]) -> Optional[StockProvider]:
     return None
 
 
+def validate_asset(path: str) -> bool:
+    """
+    Validate that a downloaded asset is usable.
+    Checks file size to ensure it's not empty or corrupted.
+    
+    Args:
+        path: Path to the asset file
+        
+    Returns:
+        True if asset is valid, False otherwise
+    """
+    if not os.path.exists(path):
+        logger.warning(f"Asset file does not exist: {path}")
+        return False
+    
+    file_size = os.path.getsize(path)
+    if file_size < MIN_VALID_FILE_SIZE:
+        logger.warning(f"Asset file is too small ({file_size} bytes): {path}")
+        return False
+    
+    logger.debug(f"Asset validated: {path} ({file_size} bytes)")
+    return True
+
+
 def download_asset(url: str, tmpdir: str) -> str:
     """Download a video or image file to temporary directory."""
     os.makedirs(tmpdir, exist_ok=True)
@@ -162,7 +189,12 @@ def download_asset(url: str, tmpdir: str) -> str:
     
     if os.path.exists(fn):
         logger.debug(f"Asset already downloaded: {fn}")
-        return fn
+        # Validate existing file
+        if validate_asset(fn):
+            return fn
+        else:
+            logger.warning(f"Existing asset is invalid, re-downloading: {fn}")
+            os.remove(fn)
     
     try:
         logger.info(f"Downloading asset from: {url}")
@@ -172,7 +204,15 @@ def download_asset(url: str, tmpdir: str) -> str:
                 for chunk in r.iter_content(chunk_size=1 << 20):
                     if chunk:
                         f.write(chunk)
-        logger.info(f"Downloaded asset to: {fn}")
+        
+        # Validate downloaded file
+        if not validate_asset(fn):
+            logger.error(f"Downloaded asset is invalid (too small or empty): {fn}")
+            if os.path.exists(fn):
+                os.remove(fn)
+            raise ValueError(f"Downloaded asset from {url} is invalid")
+        
+        logger.info(f"Downloaded and validated asset: {fn}")
         return fn
     except Exception as e:
         logger.error(f"Failed to download asset from {url}: {e}")
