@@ -7,6 +7,8 @@ Automated video generation from audio narration with stock footage from Pexels a
 ✅ **Automatic transcription** using Whisper AI  
 ✅ **Smart asset selection** with full-text queries for better relevance  
 ✅ **Multi-provider support** - Pexels and Pixabay video APIs  
+✅ **Reduced clip repetition** - Searches both providers and randomizes selection  
+✅ **Background music** - Adds classical/ambient music for better storytelling  
 ✅ **Image fallback** - Uses static images when videos aren't available  
 ✅ **No black screens** - Every segment has visual content  
 ✅ **Modular architecture** - Clean separation of concerns  
@@ -97,6 +99,28 @@ python main.py \
   --out video.mp4
 ```
 
+#### With background music:
+
+```bash
+python main.py \
+  --audio narration.mp3 \
+  --autocaptions \
+  --music-volume 0.15 \
+  --out video_with_music.mp4
+```
+
+> **Note:** Background music is enabled by default at 10% volume. Use `--no-background-music` to disable it, or `--music-volume` to adjust the volume (0.0-1.0).
+
+#### Disable background music:
+
+```bash
+python main.py \
+  --audio narration.mp3 \
+  --autocaptions \
+  --no-background-music \
+  --out video_no_music.mp4
+```
+
 ## Command-Line Options
 
 ### Required Arguments
@@ -131,6 +155,8 @@ python main.py \
 
 - `--no-subs` - Disable subtitle overlay
 - `--transitions` - Enable crossfade transitions between clips
+- `--no-background-music` - Disable background music (enabled by default)
+- `--music-volume FLOAT` - Background music volume (0.0-1.0, default: 0.1 = 10%)
 
 ### Advanced Options
 
@@ -159,10 +185,12 @@ youtube-automation/
 
 1. **No More Black Screens**: Every segment gets a video, image, or meaningful fallback
 2. **Better Content Relevance**: Uses full segment text for queries instead of just keywords
-3. **Smart Fallback Chain**: Video → Image → Simplified Query → Theme-based fallback
-4. **Comprehensive Logging**: Track every asset selection decision
-5. **Secure Configuration**: API keys in .env file, not in code
-6. **Modular Design**: Easy to extend and maintain
+3. **Reduced Clip Repetition**: Combines results from both providers and uses randomized selection with URL tracking
+4. **Background Music**: Automatically adds classical/ambient background music at low volume
+5. **Smart Fallback Chain**: Video → Image → Simplified Query → Theme-based fallback
+6. **Comprehensive Logging**: Track every asset selection decision
+7. **Secure Configuration**: API keys in .env file, not in code
+8. **Modular Design**: Easy to extend and maintain
 
 ## Custom Queries
 
@@ -177,6 +205,29 @@ Create a JSON file to override automatic query generation for specific segments:
 ```
 
 Keys are segment indices (starting from 0), values are search queries.
+
+## How Clip Variation Works
+
+To avoid repetitive clips, the system now:
+
+1. **Searches Multiple Providers**: Queries both Pexels and Pixabay simultaneously (if both API keys are configured)
+2. **Increased Results**: Fetches up to 10 clips per query instead of just 3
+3. **Randomized Selection**: Randomly selects from available clips instead of always picking the first one
+4. **URL Tracking**: Keeps track of used URLs to avoid repeating the same clip
+5. **Smart Fallback**: If all clips have been used, it will still select randomly to vary the order
+
+This approach significantly reduces repetition and provides much more variety in your videos.
+
+## Background Music
+
+The system can automatically add classical/ambient background music to enhance storytelling:
+
+- **Automatic Download**: Downloads royalty-free background music from free sources
+- **Smart Looping**: Automatically loops music to match video duration
+- **Volume Control**: Default volume is 10% (adjustable with `--music-volume`)
+- **Graceful Fallback**: If music download fails, video generation continues without interruption
+
+The background music is mixed with narration audio, creating a more professional and engaging result.
 
 ## Logging
 
