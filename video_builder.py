@@ -42,6 +42,7 @@ from download_assets import (
     download_asset,
     validate_asset,
     ImageFallbackProvider,
+    download_background_music,
 )
 from config import Config
 
@@ -418,7 +419,9 @@ def build_video(audio_path: str,
                 transitions: bool = False,
                 custom_queries_path: Optional[str] = None,
                 title: Optional[str] = None,
-                tmpdir: str = "_auto_tmp"):
+                tmpdir: str = "_auto_tmp",
+                background_music: bool = True,
+                music_volume: float = 0.1):
     """
     Build the final video from audio and segments.
     
@@ -436,6 +439,8 @@ def build_video(audio_path: str,
         custom_queries_path: Optional JSON file with custom queries per segment
         title: Optional video title for query context to ensure relevance
         tmpdir: Temporary directory for downloads
+        background_music: Whether to add background music (default: True)
+        music_volume: Volume of background music relative to narration (default: 0.1 = 10%)
     """
     logger.info(f"Building video: {out_path}")
     logger.info(f"Resolution: {resolution[0]}x{resolution[1]}, FPS: {fps}, Style: {style}")
@@ -474,6 +479,9 @@ def build_video(audio_path: str,
     w, h = resolution
     built_clips = []
     
+    # Track used URLs to avoid repetition
+    used_urls = set()
+    
     for seg in segments:
         logger.info(f"\n--- Processing segment {seg.idx} ({seg.start:.2f}s - {seg.end:.2f}s, duration: {seg.dur:.2f}s) ---")
         logger.info(f"Text: '{seg.text}'")
@@ -487,14 +495,14 @@ def build_video(audio_path: str,
             logger.info(f"Generated query: '{query}'")
         
         # Fetch asset URL
-        url, asset_type = fetch_asset_url(query, primary, fallback, image_fallback)
+        url, asset_type = fetch_asset_url(query, primary, fallback, image_fallback, used_urls)
         
         # If no results, try simplified query
         if not url:
             logger.warning(f"No results for query '{query}', trying simplified query")
             simplified_query = simplify_query(query, style, title=title)
             logger.info(f"Simplified query: '{simplified_query}'")
-            url, asset_type = fetch_asset_url(simplified_query, primary, fallback, image_fallback)
+            url, asset_type = fetch_asset_url(simplified_query, primary, fallback, image_fallback, used_urls)
         
         # Build clip based on asset type
         if not url or asset_type == "none":
@@ -583,7 +591,49 @@ def build_video(audio_path: str,
     
     # Add audio and export
     logger.info("Adding audio and exporting video...")
-    final = video.set_audio(narration)
+    
+    # Mix narration with background music if enabled
+    if background_music:
+        logger.info("Downloading and mixing background music...")
+        bg_music_path = download_background_music(tmpdir, total_dur)
+        
+        if bg_music_path:
+            try:
+                from moviepy.audio.fx.all import volumex
+                from moviepy.editor import CompositeAudioClip
+                
+                # Load background music
+                bg_audio = AudioFileClip(bg_music_path)
+                
+                # Loop or trim background music to match video duration
+                if bg_audio.duration < total_dur:
+                    # Loop the music
+                    loops_needed = int(total_dur / bg_audio.duration) + 1
+                    from moviepy.editor import concatenate_audioclips
+                    bg_audio_looped = concatenate_audioclips([bg_audio] * loops_needed)
+                    bg_audio = bg_audio_looped.subclip(0, total_dur)
+                else:
+                    # Trim to video duration
+                    bg_audio = bg_audio.subclip(0, total_dur)
+                
+                # Reduce volume of background music
+                bg_audio = bg_audio.fx(volumex, music_volume)
+                
+                # Mix narration and background music
+                mixed_audio = CompositeAudioClip([narration, bg_audio])
+                final = video.set_audio(mixed_audio)
+                
+                logger.info(f"Background music mixed at {int(music_volume * 100)}% volume")
+                
+            except Exception as e:
+                logger.error(f"Failed to mix background music: {e}, using narration only")
+                final = video.set_audio(narration)
+        else:
+            logger.warning("Background music download failed, using narration only")
+            final = video.set_audio(narration)
+    else:
+        final = video.set_audio(narration)
+    
     final.write_videofile(out_path, fps=fps, codec="libx264", audio_codec="aac", 
                          threads=4, preset="medium")
     
