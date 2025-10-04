@@ -74,6 +74,19 @@ python main.py \
   --out vertical_video.mp4
 ```
 
+#### Use title for better query relevance:
+
+```bash
+python main.py \
+  --audio narration.mp3 \
+  --autocaptions \
+  --title "Understanding the Solar System" \
+  --style nature \
+  --out solar_system.mp4
+```
+
+> **Tip:** The `--title` parameter helps keep video footage relevant to your main topic. When a segment mentions something unrelated (e.g., "like a football field" in a space video), the title keywords ensure the search still returns space-related content.
+
 #### With custom queries for specific segments:
 
 ```bash
@@ -111,6 +124,7 @@ python main.py \
 ### Style Options
 
 - `--style STYLE` - Video style: general, cinematic, nature, tech
+- `--title TEXT` - Video title for context - helps ensure queried assets stay relevant to the main topic
 - `--custom-queries PATH` - JSON file with custom search queries per segment
 
 ### Feature Toggles

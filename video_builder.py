@@ -94,7 +94,7 @@ def extract_keywords(text: str, topk: int = 4) -> List[str]:
     return [w for w, _ in ranked[:topk]] or tokens[:topk]
 
 
-def generate_query_for_segment(seg: Segment, style: str, use_full_text: bool = True) -> str:
+def generate_query_for_segment(seg: Segment, style: str, use_full_text: bool = True, title: Optional[str] = None) -> str:
     """
     Generate search query for a segment.
     
@@ -102,26 +102,43 @@ def generate_query_for_segment(seg: Segment, style: str, use_full_text: bool = T
         seg: The segment to generate query for
         style: Video style (cinematic, nature, tech, general)
         use_full_text: If True, use full segment text; if False, use keywords only
+        title: Optional video title for context to ensure relevance
     
     Returns:
         Search query string
     """
     text = seg.text.strip()
     
+    # Extract title keywords for context if title is provided
+    title_keywords = []
+    if title:
+        title_keywords = extract_keywords(title, topk=2)
+    
     if use_full_text and len(text) > 0:
         # Use full text as query for better relevance
         # Limit to first 100 chars to avoid overly long queries
         query = text[:100]
+        
+        # Add title keywords to ensure relevance to main topic
+        if title_keywords:
+            query = f"{' '.join(title_keywords)} {query}"
+        
         logger.debug(f"Segment {seg.idx}: Using full text query: '{query}'")
         return query
     else:
         # Fallback to keyword extraction
         kws = extract_keywords(text, topk=4)
         if not kws:
-            # Use theme-based fallback
+            # Use theme-based fallback, with title context if available
             query = random.choice(THEME_MAP.get(style, THEME_MAP["general"]))
+            if title_keywords:
+                query = f"{' '.join(title_keywords)} {query}"
             logger.debug(f"Segment {seg.idx}: No keywords, using theme fallback: '{query}'")
             return query
+        
+        # Combine title keywords with segment keywords for relevance
+        if title_keywords:
+            kws = title_keywords + kws[:2]  # Use top 2 title keywords + top 2 segment keywords
         
         query = " ".join(kws)
         if style in ("cinematic", "nature", "tech"):
@@ -131,19 +148,42 @@ def generate_query_for_segment(seg: Segment, style: str, use_full_text: bool = T
         return query
 
 
-def simplify_query(query: str, style: str) -> str:
+def simplify_query(query: str, style: str, title: Optional[str] = None) -> str:
     """
     Simplify a query that failed to get results.
     Extracts main keywords and adds style.
+    
+    Args:
+        query: The original query that failed
+        style: Video style
+        title: Optional video title for context
+    
+    Returns:
+        Simplified query string
     """
     kws = extract_keywords(query, topk=2)
+    
+    # Add title keywords to maintain relevance if provided
+    title_keywords = []
+    if title:
+        title_keywords = extract_keywords(title, topk=2)
+    
     if kws:
-        simplified = " ".join(kws)
+        # Combine title keywords with simplified query keywords
+        if title_keywords:
+            simplified = " ".join(title_keywords + kws[:1])  # Title keywords + 1 main keyword
+        else:
+            simplified = " ".join(kws)
+        
         if style in ("cinematic", "nature", "tech"):
             simplified += f" {style}"
         return simplified
-    # Ultimate fallback
-    return random.choice(THEME_MAP.get(style, THEME_MAP["general"]))
+    
+    # Ultimate fallback with title context if available
+    fallback = random.choice(THEME_MAP.get(style, THEME_MAP["general"]))
+    if title_keywords:
+        fallback = f"{' '.join(title_keywords)} {fallback}"
+    return fallback
 
 
 def validate_video_clip(path: str) -> bool:
@@ -377,6 +417,7 @@ def build_video(audio_path: str,
                 subs: bool = True,
                 transitions: bool = False,
                 custom_queries_path: Optional[str] = None,
+                title: Optional[str] = None,
                 tmpdir: str = "_auto_tmp"):
     """
     Build the final video from audio and segments.
@@ -393,10 +434,13 @@ def build_video(audio_path: str,
         subs: Whether to add subtitles
         transitions: Whether to add crossfade transitions
         custom_queries_path: Optional JSON file with custom queries per segment
+        title: Optional video title for query context to ensure relevance
         tmpdir: Temporary directory for downloads
     """
     logger.info(f"Building video: {out_path}")
     logger.info(f"Resolution: {resolution[0]}x{resolution[1]}, FPS: {fps}, Style: {style}")
+    if title:
+        logger.info(f"Video title (for context): '{title}'")
     
     narration = AudioFileClip(audio_path)
     total_dur = narration.duration
@@ -439,7 +483,7 @@ def build_video(audio_path: str,
             query = custom_queries[str(seg.idx)]
             logger.info(f"Using custom query: '{query}'")
         else:
-            query = generate_query_for_segment(seg, style, use_full_text=True)
+            query = generate_query_for_segment(seg, style, use_full_text=True, title=title)
             logger.info(f"Generated query: '{query}'")
         
         # Fetch asset URL
@@ -448,7 +492,7 @@ def build_video(audio_path: str,
         # If no results, try simplified query
         if not url:
             logger.warning(f"No results for query '{query}', trying simplified query")
-            simplified_query = simplify_query(query, style)
+            simplified_query = simplify_query(query, style, title=title)
             logger.info(f"Simplified query: '{simplified_query}'")
             url, asset_type = fetch_asset_url(simplified_query, primary, fallback, image_fallback)
         

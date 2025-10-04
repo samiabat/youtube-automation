@@ -95,6 +95,8 @@ Examples:
     # Style and customization
     parser.add_argument("--style", choices=["general", "cinematic", "nature", "tech"],
                        help="Video style for asset selection (default: from config or 'general')")
+    parser.add_argument("--title",
+                       help="Video title for context - helps ensure queried assets stay relevant to the main topic")
     parser.add_argument("--custom-queries", 
                        help="Path to JSON file with custom search queries per segment")
     
@@ -204,6 +206,7 @@ Examples:
         subs=args.subs,
         transitions=args.transitions,
         custom_queries_path=args.custom_queries,
+        title=args.title,
         tmpdir=args.tmpdir
     )
     

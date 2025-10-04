@@ -79,6 +79,28 @@ python main.py --audio narration.mp3 --autocaptions --style nature --out video.m
 python main.py --audio narration.mp3 --autocaptions --style tech --out video.mp4
 ```
 
+### Using Title for Better Query Relevance
+
+Provide your video's title to ensure stock footage stays relevant to the main topic:
+
+```bash
+python main.py \
+  --audio narration.mp3 \
+  --autocaptions \
+  --title "Understanding the Solar System" \
+  --style nature \
+  --out solar_system.mp4
+```
+
+**Why use --title?**
+
+When your narration mentions something in passing that's not central to your topic, the title helps keep queries on track. For example:
+
+- **Without --title:** Segment says "if we compare this to a football field" → searches for football-related content
+- **With --title "Understanding the Solar System":** Same segment → searches for "solar system football field" → returns space-related content showing scale
+
+The title keywords are intelligently combined with each segment's content to maintain topical relevance.
+
 ### Custom Search Queries
 
 Create a `queries.json` file to control exactly what footage appears for each segment:
@@ -173,11 +195,17 @@ Check the `automation.log` file to see what's happening with each segment.
 
 Try these approaches:
 
-1. **Use custom queries** for important segments (see Custom Search Queries above)
+1. **Use the --title parameter** to provide topic context:
+   ```bash
+   python main.py --audio narration.mp3 --autocaptions --title "Your Main Topic" --out video.mp4
+   ```
+   This helps ensure all queries stay relevant to your video's main subject.
 
-2. **Check the logs** in `automation.log` to see what queries are being generated
+2. **Use custom queries** for important segments (see Custom Search Queries above)
 
-3. **Try a different style** that might match your content better:
+3. **Check the logs** in `automation.log` to see what queries are being generated
+
+4. **Try a different style** that might match your content better:
    ```bash
    python main.py --audio narration.mp3 --autocaptions --style cinematic --out video.mp4
    ```
@@ -209,19 +237,21 @@ This means the full-text query didn't find results, and it's trying keywords ins
 
 1. **Test with short clips first** before processing long narrations
 
-2. **Use custom queries** for key segments where visual relevance is critical
+2. **Always use --title** to provide topic context and ensure relevant footage
 
-3. **Review the log file** after generation to understand asset selection
+3. **Use custom queries** for key segments where visual relevance is critical
 
-4. **Keep audio files under 10 minutes** for faster processing
+4. **Review the log file** after generation to understand asset selection
 
-5. **Use appropriate styles**:
+5. **Keep audio files under 10 minutes** for faster processing
+
+6. **Use appropriate styles**:
    - `general`: Safe choice for most content
    - `cinematic`: Polished, professional look
    - `nature`: Outdoor, natural environments
    - `tech`: Digital, technology-focused visuals
 
-6. **Optimize for your platform**:
+7. **Optimize for your platform**:
    - YouTube: `1920x1080`, 30fps
    - Instagram/TikTok: `1080x1920`, 30fps
    - High-end: `3840x2160` (4K), 60fps
