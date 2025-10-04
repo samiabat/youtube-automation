@@ -105,6 +105,10 @@ Examples:
                        help="Disable subtitles overlay")
     parser.add_argument("--transitions", action="store_true", default=False,
                        help="Enable crossfade transitions between clips")
+    parser.add_argument("--no-background-music", dest="background_music", action="store_false", default=True,
+                       help="Disable background music")
+    parser.add_argument("--music-volume", type=float, default=0.1,
+                       help="Background music volume (0.0-1.0, default: 0.1 = 10%%)")
     
     # Advanced options
     parser.add_argument("--min-seg", type=float, default=0.12,
@@ -207,7 +211,9 @@ Examples:
         transitions=args.transitions,
         custom_queries_path=args.custom_queries,
         title=args.title,
-        tmpdir=args.tmpdir
+        tmpdir=args.tmpdir,
+        background_music=args.background_music,
+        music_volume=args.music_volume
     )
     
     logger.info("\n" + "=" * 60)

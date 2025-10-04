@@ -157,6 +157,48 @@ python main.py \
   --out smooth_video.mp4
 ```
 
+### With Background Music
+
+Add classical/ambient background music to enhance storytelling (enabled by default):
+
+```bash
+# With custom volume (15% instead of default 10%)
+python main.py \
+  --audio narration.mp3 \
+  --autocaptions \
+  --music-volume 0.15 \
+  --out video_with_music.mp4
+
+# Disable background music
+python main.py \
+  --audio narration.mp3 \
+  --autocaptions \
+  --no-background-music \
+  --out video_no_music.mp4
+```
+
+**Background Music Features:**
+- Automatically downloads royalty-free classical/ambient music
+- Loops music to match video duration
+- Mixed at low volume (default 10%) to not overpower narration
+- Gracefully continues without music if download fails
+
+## Clip Variation and Quality
+
+The system now includes enhanced clip variation to reduce repetitive footage:
+
+### How It Works
+
+1. **Multi-Provider Search**: Queries both Pexels and Pixabay simultaneously
+2. **More Results**: Fetches up to 10 clips per query (instead of 3)
+3. **Random Selection**: Randomly picks from available clips instead of always using the first one
+4. **URL Tracking**: Remembers used clips to avoid immediate repetition
+5. **Smart Reuse**: If all clips have been used, it still varies the order
+
+### Result
+
+Much more diverse and engaging videos with minimal clip repetition!
+
 ## Troubleshooting Common Issues
 
 ### Issue: "No API keys found"
