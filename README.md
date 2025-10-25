@@ -1,17 +1,17 @@
 # YouTube Automation
 
-Automated video generation from audio narration with stock footage from Pexels and Pixabay.
+Automated video generation from audio narration with video clips from YouTube.
 
 ## Features
 
 ✅ **Automatic transcription** using Whisper AI  
 ✅ **Smart asset selection** with full-text queries for better relevance  
-✅ **Multi-provider support** - Pexels and Pixabay video APIs  
-✅ **Image fallback** - Uses static images when videos aren't available  
+✅ **YouTube video integration** - Automatically searches and downloads relevant clips  
+✅ **No API keys required** - Uses YouTube directly for video content  
 ✅ **No black screens** - Every segment has visual content  
 ✅ **Modular architecture** - Clean separation of concerns  
 ✅ **Comprehensive logging** - Track every asset selection  
-✅ **Environment-based configuration** - Secure API key management  
+✅ **Environment-based configuration** - Flexible settings  
 
 ## Quick Start
 
@@ -29,24 +29,9 @@ pip install -r requirements.txt
 python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('stopwords')"
 ```
 
-### 2. Configuration
+### 2. Configuration (Optional)
 
-Copy the example environment file and add your API keys:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and add your API keys:
-
-```env
-PEXELS_API_KEY=your_pexels_api_key_here
-PIXABAY_API_KEY=your_pixabay_api_key_here
-```
-
-**Get API Keys:**
-- Pexels: https://www.pexels.com/api/
-- Pixabay: https://pixabay.com/api/docs/
+No API keys are required for YouTube video downloads. However, you can still configure optional settings:
 
 ### 3. Usage
 
@@ -116,11 +101,6 @@ python main.py \
 - `--resolution WxH` - Video resolution, e.g., 1920x1080 or 1080x1920
 - `--fps N` - Frames per second (default: 30)
 
-### Provider Options
-
-- `--provider NAME` - Primary stock provider: pexels or pixabay
-- `--fallback NAME` - Fallback stock provider: pexels or pixabay
-
 ### Style Options
 
 - `--style STYLE` - Video style: general, cinematic, nature, tech
@@ -147,22 +127,23 @@ youtube-automation/
 ├── main.py              # Main entry point and CLI
 ├── config.py            # Configuration and environment variables
 ├── transcribe.py        # Audio transcription with Whisper
-├── download_assets.py   # Stock video/image providers
+├── download_assets.py   # YouTube video provider and downloader
 ├── video_builder.py     # Video assembly and rendering
 ├── auto_video_backaup.py  # Legacy monolithic script (backup)
-├── .env                 # Your API keys (not in git)
+├── .env                 # Optional configuration (not in git)
 ├── .env.example         # Template for .env
 └── requirements.txt     # Python dependencies
 ```
 
 ### Key Improvements
 
-1. **No More Black Screens**: Every segment gets a video, image, or meaningful fallback
+1. **No More Black Screens**: Every segment gets a video or meaningful fallback
 2. **Better Content Relevance**: Uses full segment text for queries instead of just keywords
-3. **Smart Fallback Chain**: Video → Image → Simplified Query → Theme-based fallback
-4. **Comprehensive Logging**: Track every asset selection decision
-5. **Secure Configuration**: API keys in .env file, not in code
-6. **Modular Design**: Easy to extend and maintain
+3. **YouTube Integration**: Automatically searches and downloads relevant video clips from YouTube
+4. **Smart Fallback Chain**: YouTube Video → Simplified Query → Theme-based fallback
+5. **Comprehensive Logging**: Track every asset selection decision
+6. **No API Keys Required**: Direct YouTube access without authentication
+7. **Modular Design**: Easy to extend and maintain
 
 ## Custom Queries
 
@@ -187,10 +168,10 @@ Example log output:
 2024-01-15 10:23:45 - video_builder - INFO - --- Processing segment 0 (0.00s - 3.50s, duration: 3.50s) ---
 2024-01-15 10:23:45 - video_builder - INFO - Text: 'Welcome to our tutorial on machine learning'
 2024-01-15 10:23:45 - video_builder - INFO - Generated query: 'Welcome to our tutorial on machine learning'
-2024-01-15 10:23:46 - download_assets - INFO - Searching Pexels for: 'Welcome to our tutorial on machine learning'
-2024-01-15 10:23:47 - download_assets - INFO - Pexels returned 3 video URLs
-2024-01-15 10:23:47 - download_assets - INFO - Using video from primary provider
-2024-01-15 10:23:48 - video_builder - INFO - Using video asset for segment 0
+2024-01-15 10:23:46 - download_assets - INFO - Searching YouTube for: 'Welcome to our tutorial on machine learning'
+2024-01-15 10:23:47 - download_assets - INFO - YouTube search returned 3 video URLs
+2024-01-15 10:23:47 - download_assets - INFO - Downloading YouTube clip from: https://www.youtube.com/watch?v=...
+2024-01-15 10:23:48 - video_builder - INFO - Using YouTube video clip for segment 0
 ```
 
 ## Environment Variables
@@ -198,10 +179,6 @@ Example log output:
 All settings can be configured via `.env` file:
 
 ```env
-# Required: At least one API key
-PEXELS_API_KEY=your_key
-PIXABAY_API_KEY=your_key
-
 # Optional: Whisper settings
 WHISPER_MODEL=small
 WHISPER_DEVICE=auto
@@ -211,18 +188,11 @@ DEFAULT_RESOLUTION=1920x1080
 DEFAULT_FPS=30
 DEFAULT_STYLE=general
 
-# Optional: Provider preferences
-PRIMARY_PROVIDER=pexels
-FALLBACK_PROVIDER=pixabay
-
 # Optional: Logging
 LOG_LEVEL=INFO
 ```
 
 ## Troubleshooting
-
-### No API keys error
-Make sure you've created `.env` file and added at least one valid API key.
 
 ### NLTK data not found
 Run: `python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"`
@@ -235,6 +205,12 @@ Install ffmpeg:
 
 ### Out of memory
 Try reducing video resolution or using a smaller Whisper model.
+
+### YouTube download issues
+If YouTube downloads fail, ensure you have:
+- A stable internet connection
+- The latest version of yt-dlp installed
+- FFmpeg installed and available in PATH
 
 ## License
 

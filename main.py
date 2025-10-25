@@ -44,7 +44,7 @@ def parse_resolution(s: str) -> Tuple[int, int]:
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="YouTube Automation - Generate videos from audio narration with stock footage",
+        description="YouTube Automation - Generate videos from audio narration with YouTube clips",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -86,12 +86,6 @@ Examples:
     parser.add_argument("--fps", type=int,
                        help="Frames per second (default: from config or 30)")
     
-    # Provider options
-    parser.add_argument("--provider", choices=["pexels", "pixabay"],
-                       help="Primary stock provider (default: from config or 'pexels')")
-    parser.add_argument("--fallback", choices=["pexels", "pixabay"],
-                       help="Fallback stock provider (default: from config or 'pixabay')")
-    
     # Style and customization
     parser.add_argument("--style", choices=["general", "cinematic", "nature", "tech"],
                        help="Video style for asset selection (default: from config or 'general')")
@@ -124,16 +118,7 @@ Examples:
     logger.info("=" * 60)
     logger.info("YouTube Automation - Video Generation Pipeline")
     logger.info("=" * 60)
-    
-    # Validate config
-    if not Config.validate():
-        logger.error("Configuration error: No API keys found!")
-        logger.error("Please set PEXELS_API_KEY or PIXABAY_API_KEY in .env file")
-        logger.error("Copy .env.example to .env and add your API keys")
-        sys.exit(1)
-    
-    available_providers = Config.get_available_providers()
-    logger.info(f"Available providers: {', '.join(available_providers)}")
+    logger.info("Using YouTube as video source (no API keys required)")
     
     # Validate audio file
     if not os.path.exists(args.audio):
@@ -191,15 +176,13 @@ Examples:
     
     fps = args.fps or Config.DEFAULT_FPS
     style = args.style or Config.DEFAULT_STYLE
-    provider = args.provider or Config.PRIMARY_PROVIDER
-    fallback = args.fallback or Config.FALLBACK_PROVIDER
     
     build_video(
         audio_path=args.audio,
         segments=segments,
         out_path=args.out,
-        provider_name=provider,
-        fallback_name=fallback,
+        provider_name=None,  # No longer using stock providers
+        fallback_name=None,  # No longer using stock providers
         resolution=resolution,
         fps=fps,
         style=style,
