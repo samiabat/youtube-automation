@@ -44,7 +44,7 @@ def parse_resolution(s: str) -> Tuple[int, int]:
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="YouTube Automation - Generate videos from audio narration with stock footage",
+        description="YouTube Automation - Generate videos from audio narration with YouTube clips",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -85,12 +85,6 @@ Examples:
                        help="Video resolution, e.g., 1920x1080 or 1080x1920 (default: from config)")
     parser.add_argument("--fps", type=int,
                        help="Frames per second (default: from config or 30)")
-    
-    # Provider options
-    parser.add_argument("--provider", choices=["pexels", "pixabay"],
-                       help="Primary stock provider (default: from config or 'pexels')")
-    parser.add_argument("--fallback", choices=["pexels", "pixabay"],
-                       help="Fallback stock provider (default: from config or 'pixabay')")
     
     # Style and customization
     parser.add_argument("--style", choices=["general", "cinematic", "nature", "tech"],
@@ -182,15 +176,13 @@ Examples:
     
     fps = args.fps or Config.DEFAULT_FPS
     style = args.style or Config.DEFAULT_STYLE
-    provider = args.provider or Config.PRIMARY_PROVIDER
-    fallback = args.fallback or Config.FALLBACK_PROVIDER
     
     build_video(
         audio_path=args.audio,
         segments=segments,
         out_path=args.out,
-        provider_name=provider,
-        fallback_name=fallback,
+        provider_name=None,  # No longer using stock providers
+        fallback_name=None,  # No longer using stock providers
         resolution=resolution,
         fps=fps,
         style=style,
