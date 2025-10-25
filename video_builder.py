@@ -37,12 +37,8 @@ from nltk.tokenize import word_tokenize
 
 from transcribe import Segment
 from download_assets import (
-    make_provider, 
-    fetch_asset_url,
     fetch_youtube_clip,
-    download_asset,
     validate_asset,
-    ImageFallbackProvider,
 )
 from config import Config
 

@@ -186,8 +186,6 @@ class YouTubeProvider(StockProvider):
                 'extract_audio': False,
                 'no_playlist': True,
                 'socket_timeout': 30,
-                # Download only first N seconds for efficiency
-                'download_ranges': yt_dlp.utils.download_range_func(None, [(0, max_duration)]) if max_duration else None,
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
