@@ -1,11 +1,14 @@
 """
 Stock video/image download module.
-Handles fetching assets from Pexels and Pixabay providers.
+Handles fetching assets from YouTube and stock providers.
 """
 import os
 import logging
 from typing import List, Optional, Tuple
 import requests
+import yt_dlp
+import tempfile
+import json
 
 from config import Config
 
@@ -91,6 +94,121 @@ class PixabayProvider(StockProvider):
         except Exception as e:
             logger.error(f"Pixabay search failed for '{query}': {e}")
             return []
+
+
+class YouTubeProvider(StockProvider):
+    """YouTube video provider - searches and downloads short clips."""
+    
+    def __init__(self, tmpdir: str = "_auto_tmp"):
+        self.tmpdir = tmpdir
+        os.makedirs(tmpdir, exist_ok=True)
+    
+    def search(self, query: str, count: int = 3, orientation: Optional[str] = None, 
+               resolution: Optional[str] = None) -> List[str]:
+        """
+        Search YouTube for short videos matching the query.
+        Returns list of video file paths (downloaded locally).
+        """
+        try:
+            logger.info(f"Searching YouTube for: '{query}'")
+            
+            # Configure yt-dlp options for searching
+            search_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': True,
+                'format': 'best',
+            }
+            
+            # Search YouTube for videos
+            # Use ytsearch to limit results and prefer short videos
+            search_query = f"ytsearch{count}:{query} short"
+            
+            with yt_dlp.YoutubeDL(search_opts) as ydl:
+                search_result = ydl.extract_info(search_query, download=False)
+                
+                if not search_result or 'entries' not in search_result:
+                    logger.warning(f"No YouTube results for query: '{query}'")
+                    return []
+                
+                video_urls = []
+                for entry in search_result['entries']:
+                    if entry and 'id' in entry:
+                        # Get video duration if available
+                        duration = entry.get('duration', 0)
+                        # Prefer videos under 5 minutes
+                        if duration and duration < 300:
+                            video_url = f"https://www.youtube.com/watch?v={entry['id']}"
+                            video_urls.append(video_url)
+                        elif not duration:  # Duration not available in search
+                            video_url = f"https://www.youtube.com/watch?v={entry['id']}"
+                            video_urls.append(video_url)
+                    
+                    if len(video_urls) >= count:
+                        break
+                
+                logger.info(f"YouTube search returned {len(video_urls)} video URLs for query '{query}'")
+                return video_urls
+                
+        except Exception as e:
+            logger.error(f"YouTube search failed for '{query}': {e}")
+            return []
+    
+    def download_clip(self, video_url: str, max_duration: float = 30.0) -> Optional[str]:
+        """
+        Download a short clip from a YouTube video.
+        
+        Args:
+            video_url: YouTube video URL
+            max_duration: Maximum duration to download (in seconds)
+            
+        Returns:
+            Path to downloaded video file, or None on failure
+        """
+        try:
+            logger.info(f"Downloading YouTube clip from: {video_url}")
+            
+            # Generate a unique filename based on the URL
+            video_id = video_url.split('v=')[-1].split('&')[0] if 'v=' in video_url else abs(hash(video_url))
+            output_path = os.path.join(self.tmpdir, f"yt_{video_id}.mp4")
+            
+            # Check if already downloaded
+            if os.path.exists(output_path) and validate_asset(output_path):
+                logger.info(f"YouTube clip already downloaded: {output_path}")
+                return output_path
+            
+            # Configure download options
+            ydl_opts = {
+                'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best',
+                'outtmpl': output_path,
+                'quiet': True,
+                'no_warnings': True,
+                'extract_audio': False,
+                'no_playlist': True,
+                'socket_timeout': 30,
+                # Download only first N seconds for efficiency
+                'download_ranges': yt_dlp.utils.download_range_func(None, [(0, max_duration)]) if max_duration else None,
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                }],
+            }
+            
+            # Download the video
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([video_url])
+            
+            # Validate the downloaded file
+            if os.path.exists(output_path) and validate_asset(output_path):
+                logger.info(f"YouTube clip downloaded successfully: {output_path}")
+                return output_path
+            else:
+                logger.error(f"Downloaded YouTube clip is invalid: {output_path}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to download YouTube clip from {video_url}: {e}")
+            return None
 
 
 class ImageFallbackProvider:
@@ -258,3 +376,43 @@ def fetch_asset_url(query: str, primary: Optional[StockProvider],
     
     logger.warning(f"No assets found for query: '{query}'")
     return None, "none"
+
+
+def fetch_youtube_clip(query: str, segment_duration: float, tmpdir: str = "_auto_tmp") -> Tuple[Optional[str], str]:
+    """
+    Fetch a video clip from YouTube for the given query.
+    
+    Args:
+        query: Search query for finding relevant YouTube videos
+        segment_duration: Duration of the segment (used to determine clip length)
+        tmpdir: Temporary directory for downloads
+        
+    Returns:
+        Tuple of (file_path, asset_type) where asset_type is 'youtube' or 'none'
+    """
+    try:
+        yt_provider = YouTubeProvider(tmpdir=tmpdir)
+        
+        # Search for relevant videos
+        video_urls = yt_provider.search(query, count=3)
+        
+        if not video_urls:
+            logger.warning(f"No YouTube videos found for query: '{query}'")
+            return None, "none"
+        
+        # Try to download clips from the search results
+        # Use segment duration + buffer for max download duration
+        max_download_duration = min(30.0, segment_duration + 10.0)
+        
+        for video_url in video_urls:
+            clip_path = yt_provider.download_clip(video_url, max_duration=max_download_duration)
+            if clip_path:
+                logger.info(f"Successfully downloaded YouTube clip for query: '{query}'")
+                return clip_path, "youtube"
+        
+        logger.warning(f"Failed to download any YouTube clips for query: '{query}'")
+        return None, "none"
+        
+    except Exception as e:
+        logger.error(f"YouTube clip fetching failed for '{query}': {e}")
+        return None, "none"

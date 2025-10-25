@@ -38,7 +38,8 @@ from nltk.tokenize import word_tokenize
 from transcribe import Segment
 from download_assets import (
     make_provider, 
-    fetch_asset_url, 
+    fetch_asset_url,
+    fetch_youtube_clip,
     download_asset,
     validate_asset,
     ImageFallbackProvider,
@@ -445,24 +446,7 @@ def build_video(audio_path: str,
     narration = AudioFileClip(audio_path)
     total_dur = narration.duration
     logger.info(f"Audio duration: {total_dur:.2f}s, Segments: {len(segments)}")
-    
-    # Initialize providers
-    primary = make_provider(provider_name or Config.PRIMARY_PROVIDER)
-    fallback = make_provider(fallback_name or Config.FALLBACK_PROVIDER)
-    
-    # Initialize image fallback
-    image_fallback = None
-    if Config.PEXELS_API_KEY:
-        try:
-            image_fallback = ImageFallbackProvider(provider_type="pexels")
-        except Exception as e:
-            logger.warning(f"Failed to initialize Pexels image fallback: {e}")
-    
-    if not image_fallback and Config.PIXABAY_API_KEY:
-        try:
-            image_fallback = ImageFallbackProvider(provider_type="pixabay")
-        except Exception as e:
-            logger.warning(f"Failed to initialize Pixabay image fallback: {e}")
+    logger.info("Using YouTube as video source")
     
     # Load custom queries if provided
     custom_queries = {}
@@ -486,45 +470,31 @@ def build_video(audio_path: str,
             query = generate_query_for_segment(seg, style, use_full_text=True, title=title)
             logger.info(f"Generated query: '{query}'")
         
-        # Fetch asset URL
-        url, asset_type = fetch_asset_url(query, primary, fallback, image_fallback)
+        # Fetch YouTube clip
+        video_path, asset_type = fetch_youtube_clip(query, seg.dur, tmpdir)
         
         # If no results, try simplified query
-        if not url:
-            logger.warning(f"No results for query '{query}', trying simplified query")
+        if not video_path or asset_type == "none":
+            logger.warning(f"No YouTube results for query '{query}', trying simplified query")
             simplified_query = simplify_query(query, style, title=title)
             logger.info(f"Simplified query: '{simplified_query}'")
-            url, asset_type = fetch_asset_url(simplified_query, primary, fallback, image_fallback)
+            video_path, asset_type = fetch_youtube_clip(simplified_query, seg.dur, tmpdir)
         
         # Build clip based on asset type
-        if not url or asset_type == "none":
+        if not video_path or asset_type == "none":
             # Ultimate fallback: gradient background with query text
-            logger.warning(f"No assets found, using fallback clip for segment {seg.idx}")
+            logger.warning(f"No YouTube clips found, using fallback clip for segment {seg.idx}")
             clip = create_fallback_clip(w, h, seg.dur, query)
-        elif asset_type == "image":
-            # Use image as static clip
-            logger.info(f"Using image asset for segment {seg.idx}")
-            try:
-                img_path = download_asset(url, tmpdir)
-                img_clip = ImageClip(img_path).set_duration(seg.dur)
-                img_clip = ensure_resolution(img_clip, w, h, fit="cover")
-                clip = img_clip
-            except Exception as e:
-                logger.error(f"Failed to load image: {e}, using fallback clip")
-                clip = create_fallback_clip(w, h, seg.dur, query)
         else:
-            # Use video clip
-            logger.info(f"Using video asset for segment {seg.idx}")
+            # Use YouTube video clip
+            logger.info(f"Using YouTube video clip for segment {seg.idx}")
             try:
-                path = download_asset(url, tmpdir)
-                
                 # Validate video before using
-                if not validate_video_clip(path):
-                    logger.error(f"Video validation failed for {path}, trying next asset or fallback")
-                    # Try to get another asset from the same query
+                if not validate_video_clip(video_path):
+                    logger.error(f"Video validation failed for {video_path}, using fallback")
                     clip = create_fallback_clip(w, h, seg.dur, query)
                 else:
-                    base = VideoFileClip(path, has_mask=False).without_audio()
+                    base = VideoFileClip(video_path, has_mask=False).without_audio()
                     
                     # Check if video needs to be extended
                     if base.duration < seg.dur:
@@ -542,7 +512,7 @@ def build_video(audio_path: str,
                     sub = ensure_resolution(sub, w, h, fit="cover")
                     clip = sub
             except Exception as e:
-                logger.error(f"Failed to load video: {e}, using fallback clip")
+                logger.error(f"Failed to load YouTube video: {e}, using fallback clip")
                 clip = create_fallback_clip(w, h, seg.dur, query)
         
         # Add subtitles if enabled
