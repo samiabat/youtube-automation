@@ -266,6 +266,20 @@ def smart_query_for_segment(seg: Segment, style: str) -> str:
     return q
 
 
+def fallback_clip(w: int, h: int, duration: float, text: str = "") -> 'VideoClip':
+    """Create a simple gradient background clip with centered text."""
+    # Create a simple colored background
+    bg = ColorClip(size=(w, h), color=(30, 30, 50)).set_duration(duration)
+    
+    # Add text overlay if provided
+    if text and text.strip():
+        txt_clip = make_subtitle_clip(text, w, h, fontsize=48)
+        if txt_clip is not None:
+            txt_clip = txt_clip.set_duration(duration)
+            return CompositeVideoClip([bg, txt_clip], size=(w, h))
+    
+    return bg
+
 # -------------------- Light Whisper (faster‑whisper) --------------------
 
 def auto_captions(audio_path: str, out_path: str, model_size: str = "small", device: str = "auto") -> List[Segment]:
