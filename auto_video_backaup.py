@@ -267,7 +267,7 @@ def smart_query_for_segment(seg: Segment, style: str) -> str:
 
 
 def fallback_clip(w: int, h: int, duration: float, text: str = "") -> 'VideoClip':
-    """Create a simple gradient background clip with centered text."""
+    """Create a simple colored background clip with centered text."""
     # Create a simple colored background
     bg = ColorClip(size=(w, h), color=(30, 30, 50)).set_duration(duration)
     
