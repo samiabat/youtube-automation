@@ -35,9 +35,9 @@ class Config:
     
     @classmethod
     def validate(cls) -> bool:
-        """Validate that at least one API key is set."""
-        if not cls.PEXELS_API_KEY and not cls.PIXABAY_API_KEY:
-            return False
+        """Validate configuration. API keys are optional - will use fallback clips if not provided."""
+        # API keys are now optional - return True always
+        # If no API keys are provided, the system will use fallback gradient clips
         return True
     
     @classmethod

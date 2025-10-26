@@ -29,24 +29,28 @@ pip install -r requirements.txt
 python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('stopwords')"
 ```
 
-### 2. Configuration
+### 2. Configuration (Optional)
 
-Copy the example environment file and add your API keys:
+**API keys are now optional!** The system will use gradient fallback clips if no API keys are provided.
+
+For better video quality with stock footage from Pexels and Pixabay, you can optionally configure API keys:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and add your API keys:
+Edit `.env` and add your API keys (optional):
 
 ```env
 PEXELS_API_KEY=your_pexels_api_key_here
 PIXABAY_API_KEY=your_pixabay_api_key_here
 ```
 
-**Get API Keys:**
+**Get API Keys (Optional):**
 - Pexels: https://www.pexels.com/api/
 - Pixabay: https://pixabay.com/api/docs/
+
+> **Note:** Without API keys, videos will be generated using colorful gradient backgrounds instead of stock footage.
 
 ### 3. Usage
 
@@ -198,7 +202,7 @@ Example log output:
 All settings can be configured via `.env` file:
 
 ```env
-# Required: At least one API key
+# Optional: Stock footage API keys (if not provided, will use gradient fallback clips)
 PEXELS_API_KEY=your_key
 PIXABAY_API_KEY=your_key
 
@@ -221,8 +225,8 @@ LOG_LEVEL=INFO
 
 ## Troubleshooting
 
-### No API keys error
-Make sure you've created `.env` file and added at least one valid API key.
+### Using without stock footage API keys
+The application now works without API keys! If you don't provide Pexels or Pixabay API keys, the system will automatically use colorful gradient backgrounds for video segments. For better quality with real stock footage, you can optionally add API keys to your `.env` file.
 
 ### NLTK data not found
 Run: `python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"`
