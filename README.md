@@ -1,17 +1,16 @@
 # YouTube Automation
 
-Automated video generation from audio narration with stock footage from Pexels and Pixabay.
+Automated video generation from audio narration with visual content.
 
 ## Features
 
 ✅ **Automatic transcription** using Whisper AI  
 ✅ **Smart asset selection** with full-text queries for better relevance  
-✅ **Multi-provider support** - Pexels and Pixabay video APIs  
-✅ **Image fallback** - Uses static images when videos aren't available  
+✅ **Fallback clips** - Gradient backgrounds with text when needed  
 ✅ **No black screens** - Every segment has visual content  
 ✅ **Modular architecture** - Clean separation of concerns  
-✅ **Comprehensive logging** - Track every asset selection  
-✅ **Environment-based configuration** - Secure API key management  
+✅ **Comprehensive logging** - Track every step  
+✅ **Environment-based configuration** - Flexible settings management  
 
 ## Quick Start
 
@@ -113,11 +112,6 @@ python main.py \
 - `--resolution WxH` - Video resolution, e.g., 1920x1080 or 1080x1920
 - `--fps N` - Frames per second (default: 30)
 
-### Provider Options
-
-- `--provider NAME` - Primary stock provider: pexels or pixabay
-- `--fallback NAME` - Fallback stock provider: pexels or pixabay
-
 ### Style Options
 
 - `--style STYLE` - Video style: general, cinematic, nature, tech
@@ -184,10 +178,10 @@ Example log output:
 2024-01-15 10:23:45 - video_builder - INFO - --- Processing segment 0 (0.00s - 3.50s, duration: 3.50s) ---
 2024-01-15 10:23:45 - video_builder - INFO - Text: 'Welcome to our tutorial on machine learning'
 2024-01-15 10:23:45 - video_builder - INFO - Generated query: 'Welcome to our tutorial on machine learning'
-2024-01-15 10:23:46 - download_assets - INFO - Searching Pexels for: 'Welcome to our tutorial on machine learning'
-2024-01-15 10:23:47 - download_assets - INFO - Pexels returned 3 video URLs
-2024-01-15 10:23:47 - download_assets - INFO - Using video from primary provider
-2024-01-15 10:23:48 - video_builder - INFO - Using video asset for segment 0
+2024-01-15 10:23:46 - video_builder - INFO - Processing segment 0 (0.00s - 3.50s, duration: 3.50s)
+2024-01-15 10:23:46 - video_builder - INFO - Text: 'Welcome to our tutorial on machine learning'
+2024-01-15 10:23:46 - video_builder - INFO - Generated query: 'machine learning tutorial'
+2024-01-15 10:23:47 - video_builder - INFO - Creating clip for segment 0
 ```
 
 ## Environment Variables
@@ -204,18 +198,11 @@ DEFAULT_RESOLUTION=1920x1080
 DEFAULT_FPS=30
 DEFAULT_STYLE=general
 
-# Optional: Provider preferences
-PRIMARY_PROVIDER=pexels
-FALLBACK_PROVIDER=pixabay
-
-# Optional: Logging
+# Logging
 LOG_LEVEL=INFO
 ```
 
 ## Troubleshooting
-
-### No API keys error
-Make sure you've created `.env` file and added at least one valid API key.
 
 ### NLTK data not found
 Run: `python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"`

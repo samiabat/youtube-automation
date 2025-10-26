@@ -266,31 +266,6 @@ def smart_query_for_segment(seg: Segment, style: str) -> str:
     return q
 
 
-def fetch_clip_url(query: str, primary: Optional[StockProvider], fallback: Optional[StockProvider]) -> Optional[str]:
-    for prov in (primary, fallback):
-        if not prov:
-            continue
-        try:
-            urls = prov.search(query, count=3)
-            if urls:
-                return urls[0]
-        except Exception:
-            continue
-    return None
-
-
-def download_tmp(url: str, tmpdir: str) -> str:
-    os.makedirs(tmpdir, exist_ok=True)
-    fn = os.path.join(tmpdir, f"clip_{abs(hash(url))}.mp4")
-    if not os.path.exists(fn):
-        with requests.get(url, stream=True, timeout=120) as r:
-            r.raise_for_status()
-            with open(fn, "wb") as f:
-                for chunk in r.iter_content(chunk_size=1 << 20):
-                    if chunk:
-                        f.write(chunk)
-    return fn
-
 # -------------------- Light Whisper (faster‑whisper) --------------------
 
 def auto_captions(audio_path: str, out_path: str, model_size: str = "small", device: str = "auto") -> List[Segment]:
@@ -320,8 +295,6 @@ def auto_captions(audio_path: str, out_path: str, model_size: str = "small", dev
 def build_video(audio_path: str,
                 segments: List[Segment],
                 out_path: str,
-                provider_name: Optional[str],
-                fallback_name: Optional[str],
                 resolution: Tuple[int, int],
                 fps: int,
                 style: str,
@@ -333,9 +306,6 @@ def build_video(audio_path: str,
     narration = AudioFileClip(audio_path)
     total_dur = narration.duration
 
-    primary = _make_provider(provider_name)
-    fallback = _make_provider(fallback_name)
-
     custom_queries = {}
     if custom_queries_path and os.path.exists(custom_queries_path):
         with open(custom_queries_path, "r", encoding="utf-8") as f:
@@ -346,25 +316,8 @@ def build_video(audio_path: str,
 
     for seg in segments:
         q = custom_queries.get(str(seg.idx)) or smart_query_for_segment(seg, style)
-        url = fetch_clip_url(q, primary, fallback)
-        if not url:
-            bg = ColorClip(size=(w, h), color=(0, 0, 0)).set_duration(seg.dur)
-            txt = make_subtitle_clip(q, w, h, fontsize=48)
-            if txt is not None:
-                clip = CompositeVideoClip([bg, txt.set_duration(seg.dur)], size=(w, h))
-            else:
-                clip = bg
-        else:
-            path = download_tmp(url, tmpdir)
-            base = VideoFileClip(path, has_mask=False).without_audio()
-            if base.duration <= seg.dur + 0.2:
-                sub = base
-            else:
-                max_start = max(0, base.duration - seg.dur)
-                start_t = random.uniform(0, max_start)
-                sub = base.subclip(start_t, start_t + seg.dur)
-            sub = ensure_resolution(sub, w, h, fit="cover")
-            clip = sub
+        # Create fallback clip (no external providers)
+        clip = fallback_clip(w, h, seg.dur, q)
 
         if subs:
             sclip = make_subtitle_clip(seg.text, w, h)
@@ -435,8 +388,6 @@ def main():
     ap.add_argument("--out", default="out.mp4", help="Output video path")
     ap.add_argument("--resolution", type=parse_res, default="1920x1080", help="e.g., 1920x1080 or 1080x1920")
     ap.add_argument("--fps", type=int, default=30)
-    ap.add_argument("--provider", choices=list(PROVIDERS.keys()), default="pexels")
-    ap.add_argument("--fallback", choices=list(PROVIDERS.keys()), default="pixabay")
     ap.add_argument("--style", choices=["general","cinematic","nature","tech"], default="general")
 
     # Accept both hyphen and underscore variants
@@ -477,13 +428,11 @@ def main():
         audio_path=args.audio,
         segments=segments,
         out_path=args.out,
-        provider_name=args.provider,
-        fallback_name=args.fallback,
         resolution=args.resolution,
         fps=args.fps,
         style=args.style,
         subs=not args.no_subs,
-        # transitions=not args.no_transitions,
+        transitions=not args.no_transitions,
         custom_queries_path=args.custom_queries,
     )
 

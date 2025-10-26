@@ -8,7 +8,7 @@ This document describes the implementation of fixes to prevent black/empty segme
 
 1. **Empty/Corrupted Downloads**: Files downloaded but with 0 bytes or corrupted data
 2. **Short Video Clips**: Videos shorter than segment duration causing black padding
-3. **Missing Assets**: No visual content when Pexels/Pixabay don't have matching videos
+3. **Missing Assets**: No visual content when assets are unavailable
 4. **Aspect Ratio Issues**: Portrait videos causing black bars when scaled improperly
 
 ## Implementation Details

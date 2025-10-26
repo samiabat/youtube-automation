@@ -8,7 +8,7 @@ Videos had black/empty segments even when downloads didn't fail.
 ### Root Causes
 1. **0-byte downloads** - Files created but empty
 2. **Short videos** - Clips shorter than narration causing black padding
-3. **No assets found** - Black screen when Pexels/Pixabay had no matches
+3. **No assets found** - Black screen when assets are unavailable
 4. **Aspect ratio issues** - Portrait videos with black bars
 
 ## Solution Summary

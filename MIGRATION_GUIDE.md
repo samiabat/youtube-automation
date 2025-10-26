@@ -91,18 +91,15 @@ print(f"[Whisper] Generating captions...")
 logger.info(f"--- Processing segment {seg.idx} ({seg.start:.2f}s - {seg.end:.2f}s) ---")
 logger.info(f"Text: '{seg.text}'")
 logger.info(f"Generated query: '{query}'")
-logger.info(f"Searching Pexels for: '{query}'")
-logger.info(f"Using video asset for segment {seg.idx}")
+logger.info(f"Creating clip for segment {seg.idx}")
 ```
 
-### 5. Image Fallback Support ✓
+### 5. Fallback Support ✓
 
-**New feature - not in old script:**
+**New feature - gradient backgrounds when needed:**
 ```python
-class ImageFallbackProvider:
-    """Uses static images when video clips aren't available"""
-    def search(self, query: str, count: int = 3) -> List[str]:
-        # Searches Pexels/Pixabay photo APIs
+def create_fallback_clip(w, h, duration, query):
+    """Creates gradient background with text overlay"""
 ```
 
 ## Migration Path
@@ -115,7 +112,6 @@ python auto_video_backaup.py \
   --audio narration.mp3 \
   --autocaptions \
   --out video.mp4 \
-  --provider pexels \
   --style general
 ```
 
