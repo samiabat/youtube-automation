@@ -125,15 +125,13 @@ Examples:
     logger.info("YouTube Automation - Video Generation Pipeline")
     logger.info("=" * 60)
     
-    # Validate config
-    if not Config.validate():
-        logger.error("Configuration error: No API keys found!")
-        logger.error("Please set PEXELS_API_KEY or PIXABAY_API_KEY in .env file")
-        logger.error("Copy .env.example to .env and add your API keys")
-        sys.exit(1)
-    
+    # Log available providers
     available_providers = Config.get_available_providers()
-    logger.info(f"Available providers: {', '.join(available_providers)}")
+    if available_providers:
+        logger.info(f"Available providers: {', '.join(available_providers)}")
+    else:
+        logger.warning("No API keys configured - will use fallback gradient clips only")
+        logger.info("For better results, set PEXELS_API_KEY or PIXABAY_API_KEY in .env file")
     
     # Validate audio file
     if not os.path.exists(args.audio):
