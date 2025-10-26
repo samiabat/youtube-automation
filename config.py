@@ -35,9 +35,13 @@ class Config:
     
     @classmethod
     def validate(cls) -> bool:
-        """Validate configuration. API keys are optional - will use fallback clips if not provided."""
-        # API keys are now optional - return True always
-        # If no API keys are provided, the system will use fallback gradient clips
+        """
+        Validate configuration settings.
+        
+        Returns:
+            bool: Always returns True. API keys are optional - the system
+                  will use fallback gradient clips if not provided.
+        """
         return True
     
     @classmethod

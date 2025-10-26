@@ -125,9 +125,7 @@ Examples:
     logger.info("YouTube Automation - Video Generation Pipeline")
     logger.info("=" * 60)
     
-    # Validate config
-    Config.validate()
-    
+    # Log available providers
     available_providers = Config.get_available_providers()
     if available_providers:
         logger.info(f"Available providers: {', '.join(available_providers)}")
