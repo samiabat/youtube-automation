@@ -24,15 +24,12 @@ Difficult to debug which clips were selected for each segment.
 ### 1. ✅ Fixed Dark Screens
 
 **Implementation:**
-- Added multi-tier fallback system:
-  1. Try primary video provider (Pexels/Pixabay)
-  2. Try fallback video provider
-  3. Try image from photo APIs (NEW!)
-  4. Try simplified query with keywords
-  5. Use theme-based fallback query
-  6. Last resort: informative placeholder
+- Uses fallback system:
+  1. Generate query from segment text
+  2. Create gradient background clip with text overlay
+  3. Ensures every segment has visual content
 
-**Code Location:** `download_assets.py` - `fetch_asset_url()`
+**Code Location:** `video_builder.py` - `create_fallback_clip()`
 
 **Result:** Every segment now has visual content, no more blank screens.
 
@@ -105,9 +102,10 @@ Refactored single 555-line script into 5 focused modules:
 INFO - --- Processing segment 0 (0.00s - 3.50s) ---
 INFO - Text: 'Welcome to our tutorial'
 INFO - Generated query: 'Welcome to our tutorial'
-INFO - Searching Pexels for: 'Welcome to our tutorial'
-INFO - Pexels returned 3 video URLs
-INFO - Using video from primary provider
+INFO - Processing segment 0 (0.00s - 3.50s, duration: 3.50s)
+INFO - Text: 'Welcome to our tutorial'
+INFO - Generated query: 'welcome tutorial'
+INFO - Creating clip for segment 0
 ```
 
 ---
@@ -180,29 +178,26 @@ The original script (`auto_video_backaup.py`) is preserved as a backup. Users ca
 6. Try theme-based fallback
 7. Informative placeholder (last resort)
 
-### Provider Architecture
+### Architecture Improvements
 
 **Old:**
 ```python
+# Inline provider logic
 def _make_provider(name):
-    if name == "pexels" and os.getenv("PEXELS_API_KEY"):
-        return PexelsProvider()
+    if name == "provider" and os.getenv("PROVIDER_KEY"):
+        return Provider()
     return None
 ```
 
 **New:**
 ```python
-class StockProvider:
-    """Base class with common interface"""
+# Modular, configurable architecture
+class Config:
+    """Centralized configuration"""
+    DEFAULT_RESOLUTION: str = "1920x1080"
     
-class PexelsProvider(StockProvider):
-    """Video search"""
-    
-class ImageFallbackProvider:
-    """Photo search - NEW!"""
-    
-def make_provider(name):
-    """Factory with Config integration"""
+def build_video(...):
+    """Clean, separated concerns"""
 ```
 
 ### Error Handling

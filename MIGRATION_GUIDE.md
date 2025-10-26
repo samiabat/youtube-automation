@@ -62,26 +62,20 @@ def generate_query_for_segment(seg: Segment, style: str, use_full_text: bool = T
     # Falls back to keywords only if needed
 ```
 
-### 3. API Key Management ✓
+### 3. Configuration Management ✓
 
 **Old way:**
 ```python
 # Keys directly from environment
-if name == "pexels" and os.getenv("PEXELS_API_KEY"):
-    return PexelsProvider()
+provider_key = os.getenv("SOME_API_KEY")
 ```
 
 **New way:**
 ```python
-# Centralized in config.py with validation
+# Centralized in config.py
 class Config:
-    PEXELS_API_KEY: Optional[str] = os.getenv("PEXELS_API_KEY")
-    
-    @classmethod
-    def validate(cls) -> bool:
-        if not cls.PEXELS_API_KEY and not cls.PIXABAY_API_KEY:
-            return False
-        return True
+    WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "small")
+    DEFAULT_RESOLUTION: str = os.getenv("DEFAULT_RESOLUTION", "1920x1080")
 ```
 
 ### 4. Comprehensive Logging ✓
@@ -97,18 +91,15 @@ print(f"[Whisper] Generating captions...")
 logger.info(f"--- Processing segment {seg.idx} ({seg.start:.2f}s - {seg.end:.2f}s) ---")
 logger.info(f"Text: '{seg.text}'")
 logger.info(f"Generated query: '{query}'")
-logger.info(f"Searching Pexels for: '{query}'")
-logger.info(f"Using video asset for segment {seg.idx}")
+logger.info(f"Creating clip for segment {seg.idx}")
 ```
 
-### 5. Image Fallback Support ✓
+### 5. Fallback Support ✓
 
-**New feature - not in old script:**
+**New feature - gradient backgrounds when needed:**
 ```python
-class ImageFallbackProvider:
-    """Uses static images when video clips aren't available"""
-    def search(self, query: str, count: int = 3) -> List[str]:
-        # Searches Pexels/Pixabay photo APIs
+def create_fallback_clip(w, h, duration, query):
+    """Creates gradient background with text overlay"""
 ```
 
 ## Migration Path
@@ -121,15 +112,14 @@ python auto_video_backaup.py \
   --audio narration.mp3 \
   --autocaptions \
   --out video.mp4 \
-  --provider pexels \
   --style general
 ```
 
 **New command:**
 ```bash
-# First time: setup .env file
+# First time: setup .env file (optional)
 cp .env.example .env
-# Edit .env and add your API keys
+# Edit .env to customize settings
 
 # Then run with new script
 python main.py \
@@ -140,16 +130,9 @@ python main.py \
 
 ### Environment Variables
 
-**Old:**
-```bash
-export PEXELS_API_KEY="your_key"
-export PIXABAY_API_KEY="your_key"
-```
-
 **New (.env file):**
 ```env
-PEXELS_API_KEY=your_key
-PIXABAY_API_KEY=your_key
+WHISPER_MODEL=small
 DEFAULT_RESOLUTION=1920x1080
 DEFAULT_FPS=30
 LOG_LEVEL=INFO

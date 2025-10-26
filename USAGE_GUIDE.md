@@ -215,10 +215,10 @@ Try these approaches:
 The script creates detailed logs in `automation.log`. Here's what to look for:
 
 ```
-INFO - Searching Pexels for: 'Welcome to our tutorial'
-INFO - Pexels returned 3 video URLs
-INFO - Using video from primary provider
-INFO - Using video asset for segment 0
+INFO - Processing segment 0 (0.00s - 3.50s, duration: 3.50s)
+INFO - Text: 'Welcome to our tutorial'
+INFO - Generated query: 'welcome tutorial'
+INFO - Creating clip for segment 0
 ```
 
 This tells you:
@@ -276,15 +276,6 @@ If you encounter issues:
 3. Verify your API keys are correct in `.env`
 4. Make sure ffmpeg is installed
 5. Check that you have enough disk space
-
-## API Rate Limits
-
-Both Pexels and Pixabay have rate limits:
-
-- **Pexels**: 200 requests/hour (free tier)
-- **Pixabay**: 5,000 requests/hour (with API key)
-
-The script automatically falls back between providers, so having both API keys helps avoid rate limits.
 
 ## Next Steps
 

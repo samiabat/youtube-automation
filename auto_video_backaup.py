@@ -1,12 +1,12 @@
 """
-Audio→Stock Video Auto-Editor (InVideo‑style) + Light Whisper Captions — Solid Build
+Audio→Video Auto-Editor + Light Whisper Captions — Solid Build
 ----------------------------------------------------------------------------------
-This script turns a narration audio into a synced stock‑video edit:
+This script turns a narration audio into a synced video edit:
 1) (Optional) Runs **faster‑whisper** to auto‑generate VTT captions from audio.
 2) Parses captions (VTT/SRT) into timed segments.
 3) Extracts search keywords per segment.
-4) Fetches stock clips from **Pexels** / **Pixabay** via API keys.
-5) Cuts to duration, resizes/crops to frame, overlays subtitles (Pillow — no ImageMagick),
+4) Creates gradient background clips with text overlays.
+5) Cuts to duration, resizes/crop to frame, overlays subtitles (Pillow — no ImageMagick),
    adds safe crossfades, and exports an MP4 aligned to your original audio.
 
 Hardening in this build
@@ -15,7 +15,6 @@ Hardening in this build
 - M1/M2 friendly Whisper: sane compute types; `--device auto` ⇒ CPU by default.
 - **Zero-size-mask fix**: subtitles use an explicit grayscale mask with guaranteed ≥2×2 size.
 - **Safe crossfades**: overlap clamped; or disable with `--no-transitions`/`--no_transitions`.
-- Providers optional: if a key is missing, that provider is skipped gracefully.
 - NLTK guards: downloads `punkt`, `punkt_tab`, `stopwords` if missing.
 - CLI accepts both hyphen/underscore `--no-subs`/`--no_subs`, `--no-transitions`/`--no_transitions`.
 
@@ -26,10 +25,6 @@ Python 3.9+, ffmpeg, moviepy==1.0.3, requests, webvtt-py, pysrt, nltk, faster-wh
 Install:
     pip install moviepy==1.0.3 requests webvtt-py pysrt nltk faster-whisper pillow
     python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('stopwords')"
-
-Env (set at least one):
-    export PEXELS_API_KEY="..."   # https://www.pexels.com/api/
-    export PIXABAY_API_KEY="..."  # https://pixabay.com/api/docs/#api_videos
 """
 
 import os
@@ -167,65 +162,6 @@ def extract_keywords(text: str, topk: int = 4) -> List[str]:
     return [w for w, _ in ranked[:topk]] or tokens[:topk]
 
 # -------------------- Stock providers --------------------
-
-class StockProvider:
-    def search(self, query: str, count: int = 3, orientation: Optional[str] = None, resolution: Optional[str] = None) -> List[str]:
-        raise NotImplementedError
-
-class PexelsProvider(StockProvider):
-    def __init__(self, api_key: Optional[str] = None):
-        self.key = api_key or os.getenv("PEXELS_API_KEY")
-        self.base = "https://api.pexels.com/videos/search"
-        if not self.key:
-            raise ValueError("PEXELS_API_KEY not set")
-
-    def search(self, query: str, count: int = 3, orientation: Optional[str] = None, resolution: Optional[str] = None) -> List[str]:
-        headers = {"Authorization": self.key}
-        params = {"query": query, "per_page": count}
-        r = requests.get(self.base, headers=headers, params=params, timeout=30)
-        r.raise_for_status()
-        data = r.json()
-        urls = []
-        for v in data.get("videos", []):
-            files = v.get("video_files", [])
-            files = sorted(files, key=lambda f: abs((f.get("height") or 0) - 1080))
-            if files:
-                urls.append(files[0]["link"])
-        return urls
-
-class PixabayProvider(StockProvider):
-    def __init__(self, api_key: Optional[str] = None):
-        self.key = api_key or os.getenv("PIXABAY_API_KEY")
-        self.base = "https://pixabay.com/api/videos/"
-        if not self.key:
-            raise ValueError("PIXABAY_API_KEY not set")
-
-    def search(self, query: str, count: int = 3, orientation: Optional[str] = None, resolution: Optional[str] = None) -> List[str]:
-        params = {"key": self.key, "q": query, "per_page": count}
-        r = requests.get(self.base, params=params, timeout=30)
-        r.raise_for_status()
-        data = r.json()
-        urls = []
-        for hit in data.get("hits", []):
-            vids = hit.get("videos", {})
-            for k in ["large", "full_hd", "hd", "medium"]:
-                if k in vids and vids[k].get("url"):
-                    urls.append(vids[k]["url"])
-                    break
-        return urls
-
-PROVIDERS = {"pexels": PexelsProvider, "pixabay": PixabayProvider}
-
-
-def _make_provider(name: Optional[str]):
-    if not name:
-        return None
-    if name == "pexels" and os.getenv("PEXELS_API_KEY"):
-        return PexelsProvider()
-    if name == "pixabay" and os.getenv("PIXABAY_API_KEY"):
-        return PixabayProvider()
-    return None
-
 # -------------------- Video assembly --------------------
 
 def ensure_resolution(clip, w, h, fit="cover"):
@@ -330,30 +266,19 @@ def smart_query_for_segment(seg: Segment, style: str) -> str:
     return q
 
 
-def fetch_clip_url(query: str, primary: Optional[StockProvider], fallback: Optional[StockProvider]) -> Optional[str]:
-    for prov in (primary, fallback):
-        if not prov:
-            continue
-        try:
-            urls = prov.search(query, count=3)
-            if urls:
-                return urls[0]
-        except Exception:
-            continue
-    return None
-
-
-def download_tmp(url: str, tmpdir: str) -> str:
-    os.makedirs(tmpdir, exist_ok=True)
-    fn = os.path.join(tmpdir, f"clip_{abs(hash(url))}.mp4")
-    if not os.path.exists(fn):
-        with requests.get(url, stream=True, timeout=120) as r:
-            r.raise_for_status()
-            with open(fn, "wb") as f:
-                for chunk in r.iter_content(chunk_size=1 << 20):
-                    if chunk:
-                        f.write(chunk)
-    return fn
+def fallback_clip(w: int, h: int, duration: float, text: str = "") -> 'VideoClip':
+    """Create a simple colored background clip with centered text."""
+    # Create a simple colored background
+    bg = ColorClip(size=(w, h), color=(30, 30, 50)).set_duration(duration)
+    
+    # Add text overlay if provided
+    if text and text.strip():
+        txt_clip = make_subtitle_clip(text, w, h, fontsize=48)
+        if txt_clip is not None:
+            txt_clip = txt_clip.set_duration(duration)
+            return CompositeVideoClip([bg, txt_clip], size=(w, h))
+    
+    return bg
 
 # -------------------- Light Whisper (faster‑whisper) --------------------
 
@@ -384,8 +309,6 @@ def auto_captions(audio_path: str, out_path: str, model_size: str = "small", dev
 def build_video(audio_path: str,
                 segments: List[Segment],
                 out_path: str,
-                provider_name: Optional[str],
-                fallback_name: Optional[str],
                 resolution: Tuple[int, int],
                 fps: int,
                 style: str,
@@ -397,9 +320,6 @@ def build_video(audio_path: str,
     narration = AudioFileClip(audio_path)
     total_dur = narration.duration
 
-    primary = _make_provider(provider_name)
-    fallback = _make_provider(fallback_name)
-
     custom_queries = {}
     if custom_queries_path and os.path.exists(custom_queries_path):
         with open(custom_queries_path, "r", encoding="utf-8") as f:
@@ -410,25 +330,8 @@ def build_video(audio_path: str,
 
     for seg in segments:
         q = custom_queries.get(str(seg.idx)) or smart_query_for_segment(seg, style)
-        url = fetch_clip_url(q, primary, fallback)
-        if not url:
-            bg = ColorClip(size=(w, h), color=(0, 0, 0)).set_duration(seg.dur)
-            txt = make_subtitle_clip(q, w, h, fontsize=48)
-            if txt is not None:
-                clip = CompositeVideoClip([bg, txt.set_duration(seg.dur)], size=(w, h))
-            else:
-                clip = bg
-        else:
-            path = download_tmp(url, tmpdir)
-            base = VideoFileClip(path, has_mask=False).without_audio()
-            if base.duration <= seg.dur + 0.2:
-                sub = base
-            else:
-                max_start = max(0, base.duration - seg.dur)
-                start_t = random.uniform(0, max_start)
-                sub = base.subclip(start_t, start_t + seg.dur)
-            sub = ensure_resolution(sub, w, h, fit="cover")
-            clip = sub
+        # Create fallback clip (no external providers)
+        clip = fallback_clip(w, h, seg.dur, q)
 
         if subs:
             sclip = make_subtitle_clip(seg.text, w, h)
@@ -499,8 +402,6 @@ def main():
     ap.add_argument("--out", default="out.mp4", help="Output video path")
     ap.add_argument("--resolution", type=parse_res, default="1920x1080", help="e.g., 1920x1080 or 1080x1920")
     ap.add_argument("--fps", type=int, default=30)
-    ap.add_argument("--provider", choices=list(PROVIDERS.keys()), default="pexels")
-    ap.add_argument("--fallback", choices=list(PROVIDERS.keys()), default="pixabay")
     ap.add_argument("--style", choices=["general","cinematic","nature","tech"], default="general")
 
     # Accept both hyphen and underscore variants
@@ -541,13 +442,11 @@ def main():
         audio_path=args.audio,
         segments=segments,
         out_path=args.out,
-        provider_name=args.provider,
-        fallback_name=args.fallback,
         resolution=args.resolution,
         fps=args.fps,
         style=args.style,
         subs=not args.no_subs,
-        # transitions=not args.no_transitions,
+        transitions=not args.no_transitions,
         custom_queries_path=args.custom_queries,
     )
 
