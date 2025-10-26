@@ -180,29 +180,26 @@ The original script (`auto_video_backaup.py`) is preserved as a backup. Users ca
 6. Try theme-based fallback
 7. Informative placeholder (last resort)
 
-### Provider Architecture
+### Architecture Improvements
 
 **Old:**
 ```python
+# Inline provider logic
 def _make_provider(name):
-    if name == "pexels" and os.getenv("PEXELS_API_KEY"):
-        return PexelsProvider()
+    if name == "provider" and os.getenv("PROVIDER_KEY"):
+        return Provider()
     return None
 ```
 
 **New:**
 ```python
-class StockProvider:
-    """Base class with common interface"""
+# Modular, configurable architecture
+class Config:
+    """Centralized configuration"""
+    DEFAULT_RESOLUTION: str = "1920x1080"
     
-class PexelsProvider(StockProvider):
-    """Video search"""
-    
-class ImageFallbackProvider:
-    """Photo search - NEW!"""
-    
-def make_provider(name):
-    """Factory with Config integration"""
+def build_video(...):
+    """Clean, separated concerns"""
 ```
 
 ### Error Handling

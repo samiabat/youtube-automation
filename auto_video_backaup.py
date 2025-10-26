@@ -1,12 +1,12 @@
 """
-Audio→Stock Video Auto-Editor (InVideo‑style) + Light Whisper Captions — Solid Build
+Audio→Video Auto-Editor + Light Whisper Captions — Solid Build
 ----------------------------------------------------------------------------------
-This script turns a narration audio into a synced stock‑video edit:
+This script turns a narration audio into a synced video edit:
 1) (Optional) Runs **faster‑whisper** to auto‑generate VTT captions from audio.
 2) Parses captions (VTT/SRT) into timed segments.
 3) Extracts search keywords per segment.
-4) Fetches stock clips from **Pexels** / **Pixabay** via API keys.
-5) Cuts to duration, resizes/crops to frame, overlays subtitles (Pillow — no ImageMagick),
+4) Creates gradient background clips with text overlays.
+5) Cuts to duration, resizes/crop to frame, overlays subtitles (Pillow — no ImageMagick),
    adds safe crossfades, and exports an MP4 aligned to your original audio.
 
 Hardening in this build
@@ -15,7 +15,6 @@ Hardening in this build
 - M1/M2 friendly Whisper: sane compute types; `--device auto` ⇒ CPU by default.
 - **Zero-size-mask fix**: subtitles use an explicit grayscale mask with guaranteed ≥2×2 size.
 - **Safe crossfades**: overlap clamped; or disable with `--no-transitions`/`--no_transitions`.
-- Providers optional: if a key is missing, that provider is skipped gracefully.
 - NLTK guards: downloads `punkt`, `punkt_tab`, `stopwords` if missing.
 - CLI accepts both hyphen/underscore `--no-subs`/`--no_subs`, `--no-transitions`/`--no_transitions`.
 
@@ -26,10 +25,6 @@ Python 3.9+, ffmpeg, moviepy==1.0.3, requests, webvtt-py, pysrt, nltk, faster-wh
 Install:
     pip install moviepy==1.0.3 requests webvtt-py pysrt nltk faster-whisper pillow
     python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('stopwords')"
-
-Env (set at least one):
-    export PEXELS_API_KEY="..."   # https://www.pexels.com/api/
-    export PIXABAY_API_KEY="..."  # https://pixabay.com/api/docs/#api_videos
 """
 
 import os
@@ -167,65 +162,6 @@ def extract_keywords(text: str, topk: int = 4) -> List[str]:
     return [w for w, _ in ranked[:topk]] or tokens[:topk]
 
 # -------------------- Stock providers --------------------
-
-class StockProvider:
-    def search(self, query: str, count: int = 3, orientation: Optional[str] = None, resolution: Optional[str] = None) -> List[str]:
-        raise NotImplementedError
-
-class PexelsProvider(StockProvider):
-    def __init__(self, api_key: Optional[str] = None):
-        self.key = api_key or os.getenv("PEXELS_API_KEY")
-        self.base = "https://api.pexels.com/videos/search"
-        if not self.key:
-            raise ValueError("PEXELS_API_KEY not set")
-
-    def search(self, query: str, count: int = 3, orientation: Optional[str] = None, resolution: Optional[str] = None) -> List[str]:
-        headers = {"Authorization": self.key}
-        params = {"query": query, "per_page": count}
-        r = requests.get(self.base, headers=headers, params=params, timeout=30)
-        r.raise_for_status()
-        data = r.json()
-        urls = []
-        for v in data.get("videos", []):
-            files = v.get("video_files", [])
-            files = sorted(files, key=lambda f: abs((f.get("height") or 0) - 1080))
-            if files:
-                urls.append(files[0]["link"])
-        return urls
-
-class PixabayProvider(StockProvider):
-    def __init__(self, api_key: Optional[str] = None):
-        self.key = api_key or os.getenv("PIXABAY_API_KEY")
-        self.base = "https://pixabay.com/api/videos/"
-        if not self.key:
-            raise ValueError("PIXABAY_API_KEY not set")
-
-    def search(self, query: str, count: int = 3, orientation: Optional[str] = None, resolution: Optional[str] = None) -> List[str]:
-        params = {"key": self.key, "q": query, "per_page": count}
-        r = requests.get(self.base, params=params, timeout=30)
-        r.raise_for_status()
-        data = r.json()
-        urls = []
-        for hit in data.get("hits", []):
-            vids = hit.get("videos", {})
-            for k in ["large", "full_hd", "hd", "medium"]:
-                if k in vids and vids[k].get("url"):
-                    urls.append(vids[k]["url"])
-                    break
-        return urls
-
-PROVIDERS = {"pexels": PexelsProvider, "pixabay": PixabayProvider}
-
-
-def _make_provider(name: Optional[str]):
-    if not name:
-        return None
-    if name == "pexels" and os.getenv("PEXELS_API_KEY"):
-        return PexelsProvider()
-    if name == "pixabay" and os.getenv("PIXABAY_API_KEY"):
-        return PixabayProvider()
-    return None
-
 # -------------------- Video assembly --------------------
 
 def ensure_resolution(clip, w, h, fit="cover"):

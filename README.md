@@ -37,16 +37,13 @@ Copy the example environment file and add your API keys:
 cp .env.example .env
 ```
 
-Edit `.env` and add your API keys:
+Edit `.env` to customize settings (optional):
 
 ```env
-PEXELS_API_KEY=your_pexels_api_key_here
-PIXABAY_API_KEY=your_pixabay_api_key_here
+WHISPER_MODEL=small
+DEFAULT_RESOLUTION=1920x1080
+DEFAULT_FPS=30
 ```
-
-**Get API Keys:**
-- Pexels: https://www.pexels.com/api/
-- Pixabay: https://pixabay.com/api/docs/
 
 ### 3. Usage
 
@@ -198,15 +195,11 @@ Example log output:
 All settings can be configured via `.env` file:
 
 ```env
-# Required: At least one API key
-PEXELS_API_KEY=your_key
-PIXABAY_API_KEY=your_key
-
-# Optional: Whisper settings
+# Whisper settings
 WHISPER_MODEL=small
 WHISPER_DEVICE=auto
 
-# Optional: Video settings
+# Video settings
 DEFAULT_RESOLUTION=1920x1080
 DEFAULT_FPS=30
 DEFAULT_STYLE=general
